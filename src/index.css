@@ -112,22 +112,7 @@ const kecamatanList = [
 ];
 
 const defaultSchoolsData = [
-  { name: "SDN 1 Tanjung", kecamatan: "Tanjung", url: "#" },
-  { name: "SDN 2 Tanjung", kecamatan: "Tanjung", url: "#" },
-  { name: "SDN 1 Murung Pudak", kecamatan: "Murung Pudak", url: "#" },
-  { name: "SDN 3 Murung Pudak", kecamatan: "Murung Pudak", url: "#" },
   { name: "SD Negeri 2 Kapar", kecamatan: "Murung Pudak", url: "https://www.sdn2kapar.sch.id/" },
-  { name: "SDN 1 Kelua", kecamatan: "Kelua", url: "#" },
-  { name: "SDN 2 Kelua", kecamatan: "Kelua", url: "#" },
-  { name: "SDN 1 Tanta", kecamatan: "Tanta", url: "#" },
-  { name: "SDN 1 Banua Lawas", kecamatan: "Banua Lawas", url: "#" },
-  { name: "SDN 1 Haruai", kecamatan: "Haruai", url: "#" },
-  { name: "SDN 1 Upau", kecamatan: "Upau", url: "#" },
-  { name: "SDN 1 Muara Uya", kecamatan: "Muara Uya", url: "#" },
-  { name: "SDN 1 Jaro", kecamatan: "Jaro", url: "#" },
-  { name: "SDN 1 Pugaan", kecamatan: "Pugaan", url: "#" },
-  { name: "SDN 1 Bintang Ara", kecamatan: "Bintang Ara", url: "#" },
-  { name: "SDN 1 Muara Harus", kecamatan: "Muara Harus", url: "#" },
 ];
 
 // Ganti URL ini dengan URL Web App Google Apps Script Anda setelah di-deploy
