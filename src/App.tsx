@@ -182,7 +182,13 @@ export default function App() {
 
     // Profil Tim
     const unsubProfiles = onSnapshot(collection(db, "portal_profil_tim"), (snapshot) => {
-      if (!snapshot.empty) setProfiles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      if (!snapshot.empty) {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+        setProfiles(data);
+      } else {
+        setProfiles([]);
+      }
     });
 
     // Aplikasi
