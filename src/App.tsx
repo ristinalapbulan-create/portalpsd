@@ -4,12 +4,14 @@
  */
 
 import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "motion/react";
-import { 
-  LayoutGrid, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  ChevronRight, 
+import { db } from './lib/firebase';
+import { collection, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, increment, setDoc, getDoc } from 'firebase/firestore';
+import {
+  LayoutGrid,
+  Phone,
+  Mail,
+  MapPin,
+  ChevronRight,
   ExternalLink,
   FileStack,
   BarChart3,
@@ -37,7 +39,8 @@ import {
   Lightbulb,
   AppWindow,
   Fingerprint,
-  Youtube
+  Youtube,
+  ArrowUp
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 
@@ -47,14 +50,14 @@ const navLinks = [
   { name: "Profil Tim", href: "#profil", icon: Users },
   { name: "Saran & Usulan", href: "#formulir", icon: MessageSquare },
   { name: "FAQ", href: "#faq", icon: HelpCircle },
-  
+
 ];
 
-const applications = [
+const defaultApplications = [
   {
     title: "Si Pandu",
     description: "Sistem Pelaporan & Arsip Digital Unggulan Sekolah Dasar untuk mengumpulkan laporan bulanan Sekolah.",
-    icon: <FileStack className="w-5 h-5 text-primary" />,
+    icon: "FileStack",
     stats: "Laporan Bulanan",
     link: "https://sipandusd.disdikbudtabalong.id/",
     status: "Active"
@@ -62,7 +65,7 @@ const applications = [
   {
     title: "Saraba",
     description: "Sistem Aplikasi Rancang Berbagai Acara. Pantau partisipasi, jadwal, dan metrik kegiatan pendidikan.",
-    icon: <BarChart3 className="w-5 h-5 text-primary" />,
+    icon: "BarChart3",
     stats: "Monitoring Kegiatan",
     link: "https://sarabasd.disdikbudtabalong.id/",
     status: "Active"
@@ -70,12 +73,20 @@ const applications = [
   {
     title: "Simpeka",
     description: "Sistem Manajemen PEKA untuk Sekolah Dasar. Pengelolaan dan pengumpulan laporan PEKA siswa.",
-    icon: <ShieldCheck className="w-5 h-5 text-primary" />,
+    icon: "ShieldCheck",
     stats: "Manajemen PEKA",
     link: "#",
     status: "Coming Soon"
   }
 ];
+
+const iconMap: Record<string, React.FC<any>> = {
+  FileStack, BarChart3, ShieldCheck, LayoutGrid, Phone, Mail, MapPin,
+  ChevronRight, ExternalLink, Calendar, CalendarDays, CalendarRange,
+  Globe, Database, UserCheck, Facebook, Instagram, Twitter, Plus, Minus,
+  CheckCircle2, XCircle, Layers, Zap, Cpu, HelpCircle, MessageSquare,
+  Users, GraduationCap, Lightbulb, AppWindow, Fingerprint, Youtube
+};
 
 const faqs = [
   {
@@ -111,46 +122,13 @@ const kecamatanList = [
   "Muara Harus"
 ];
 
-const defaultSchoolsData = [
-  { name: "SDN 1 Tanjung", kecamatan: "Tanjung", url: "#" },
-  { name: "SDN 2 Tanjung", kecamatan: "Tanjung", url: "#" },
-  { name: "SDN 1 Murung Pudak", kecamatan: "Murung Pudak", url: "#" },
-  { name: "SDN 3 Murung Pudak", kecamatan: "Murung Pudak", url: "#" },
-  { name: "SD Negeri 2 Kapar", kecamatan: "Murung Pudak", url: "https://www.sdn2kapar.sch.id/" },
-  { name: "SDN 1 Kelua", kecamatan: "Kelua", url: "#" },
-  { name: "SDN 2 Kelua", kecamatan: "Kelua", url: "#" },
-  { name: "SDN 1 Tanta", kecamatan: "Tanta", url: "#" },
-  { name: "SDN 1 Banua Lawas", kecamatan: "Banua Lawas", url: "#" },
-  { name: "SDN 1 Haruai", kecamatan: "Haruai", url: "#" },
-  { name: "SDN 1 Upau", kecamatan: "Upau", url: "#" },
-  { name: "SDN 1 Muara Uya", kecamatan: "Muara Uya", url: "#" },
-  { name: "SDN 1 Jaro", kecamatan: "Jaro", url: "#" },
-  { name: "SDN 1 Pugaan", kecamatan: "Pugaan", url: "#" },
-  { name: "SDN 1 Bintang Ara", kecamatan: "Bintang Ara", url: "#" },
-  { name: "SDN 1 Muara Harus", kecamatan: "Muara Harus", url: "#" },
-];
 
-// Ganti URL ini dengan URL Web App Google Apps Script Anda setelah di-deploy
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwBBvLuDH1cPmYKd0tWrkNonezqtkWa6o3kQz8n1hmBMVCNrgx83xwKZLx60wa3Pshr/exec";
-const PROFIL_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwBBvLuDH1cPmYKd0tWrkNonezqtkWa6o3kQz8n1hmBMVCNrgx83xwKZLx60wa3Pshr/exec";
 
 export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [profiles, setProfiles] = useState([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
 
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      try {
-        const response = await fetch(PROFIL_SCRIPT_URL);
-        const data = await response.json();
-        setProfiles(data.profiles);
-      } catch (error) {
-        console.error("Error fetching profiles:", error);
-      }
-    };
-    fetchProfiles();
-  }, []);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [selectedKecamatan, setSelectedKecamatan] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -159,8 +137,10 @@ export default function App() {
   const [activeFormModal, setActiveFormModal] = useState<'kritik' | 'usul' | null>(null);
   const [policyModal, setPolicyModal] = useState<'privacy' | 'terms' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
-  const [schoolsData, setSchoolsData] = useState<any[]>(defaultSchoolsData);
+  const [schoolsData, setSchoolsData] = useState<any[]>([]);
+  const [applicationsData, setApplicationsData] = useState<any[]>([]);
   const [stats, setStats] = useState({
     today: 145,
     month: 4320,
@@ -175,65 +155,68 @@ export default function App() {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Mencegah F12
-      if (e.key === 'F12') {
-        e.preventDefault();
-      }
-      // Mencegah Ctrl+Shift+I / Cmd+Option+I (Inspect)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i')) {
-        e.preventDefault();
-      }
-      // Mencegah Ctrl+Shift+J / Cmd+Option+J (Console)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'J' || e.key === 'j')) {
-        e.preventDefault();
-      }
-      // Mencegah Ctrl+Shift+C / Cmd+Option+C (Inspect Element)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
-        e.preventDefault();
-      }
-      // Mencegah Ctrl+U / Cmd+U (View Source)
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'U' || e.key === 'u')) {
-        e.preventDefault();
-      }
+      if (e.key === 'F12') e.preventDefault();
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i')) e.preventDefault();
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'J' || e.key === 'j')) e.preventDefault();
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) e.preventDefault();
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'U' || e.key === 'u')) e.preventDefault();
     };
+
+    const handleScroll = () => setShowScrollTop(window.scrollY > 400);
 
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScroll);
 
     return () => {
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
-  // Fetch data from Google Apps Script
+  // Firebase Realtime Subscriptions
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch(SCRIPT_URL);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.schools && data.schools.length > 0) {
-            setSchoolsData(data.schools);
-          }
-          if (data.stats) {
-            setStats({
-              today: parseInt(data.stats.today) || 145,
-              month: parseInt(data.stats.month) || 4320,
-              year: parseInt(data.stats.year) || 52104,
-              total: parseInt(data.stats.total) || 154201
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching data from Google Sheets:", error);
-      }
-    };
+    // 🧹 FORCE CLEAR CACHE (Berdasarkan request untuk membersihkan data cache lama)
+    localStorage.clear();
 
-    // Only fetch if SCRIPT_URL is set to a real URL
-    if (!SCRIPT_URL.includes("PLACEHOLDER")) {
-      fetchData();
-    }
+    // Profil Tim
+    const unsubProfiles = onSnapshot(collection(db, "portal_profil_tim"), (snapshot) => {
+      if (!snapshot.empty) setProfiles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // Aplikasi
+    const unsubApps = onSnapshot(collection(db, "portal_aplikasi"), (snapshot) => {
+      if (!snapshot.empty) setApplicationsData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // Usulan Sekolah (Tanya Admin Dulu / Filter by verification)
+    const unsubSekolah = onSnapshot(collection(db, "portal_usulan_sekolah"), (snapshot) => {
+      if (!snapshot.empty) {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const verifiedOnly = data.filter((s: any) => s.verified);
+        setSchoolsData(verifiedOnly.map((s: any) => ({ ...s, name: s.namaSekolah || s.name })));
+      } else {
+        setSchoolsData([]);
+      }
+    });
+
+    // Statistik
+    const statRef = doc(db, "portal_statistik", "main");
+    const unsubStats = onSnapshot(statRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        setStats(docSnap.data() as any);
+      } else {
+        await setDoc(statRef, stats);
+      }
+    });
+
+    return () => {
+      unsubProfiles();
+      unsubApps();
+      unsubSekolah();
+      unsubStats();
+    };
   }, []);
 
   const handleKritikSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -241,23 +224,15 @@ export default function App() {
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const data = {
-      action: 'kritik',
+      tanggal: new Date().toLocaleDateString('id-ID'),
       nama: formData.get('nama'),
       email: formData.get('email'),
-      pesan: formData.get('pesan')
+      pesan: formData.get('pesan'),
+      timestamp: serverTimestamp()
     };
 
     try {
-      if (!SCRIPT_URL.includes("PLACEHOLDER")) {
-        await fetch(SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(data)
-        });
-      } else {
-        // Simulate network request if no real URL
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      await addDoc(collection(db, 'portal_kritik_saran'), data);
     } catch (error) {
       console.error("Error submitting:", error);
     } finally {
@@ -271,23 +246,15 @@ export default function App() {
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const data = {
-      action: 'usulan',
+      verified: false,
       namaSekolah: formData.get('namaSekolah'),
       kecamatan: formData.get('kecamatan'),
-      url: formData.get('url')
+      url: formData.get('url'),
+      timestamp: serverTimestamp()
     };
 
     try {
-      if (!SCRIPT_URL.includes("PLACEHOLDER")) {
-        await fetch(SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(data)
-        });
-      } else {
-        // Simulate network request if no real URL
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      await addDoc(collection(db, 'portal_usulan_sekolah'), data);
     } catch (error) {
       console.error("Error submitting:", error);
     } finally {
@@ -297,22 +264,29 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Catat kunjungan nyata ke Google Apps Script
     const recordVisit = async () => {
       try {
-        if (!SCRIPT_URL.includes("PLACEHOLDER")) {
-          await fetch(SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'visit' })
+        const statRef = doc(db, "portal_statistik", "main");
+        const docSnap = await getDoc(statRef);
+        if(docSnap.exists()){
+          await updateDoc(statRef, {
+            today: increment(1),
+            month: increment(1),
+            year: increment(1),
+            total: increment(1)
+          });
+        } else {
+          await setDoc(statRef, {
+            today: 145 + 1,
+            month: 4320 + 1,
+            year: 52104 + 1,
+            total: 154201 + 1
           });
         }
       } catch (error) {
         console.error("Error recording visit:", error);
       }
     };
-
-    // Panggil fungsi pencatat kunjungan sekali saat website dimuat
     recordVisit();
   }, []);
 
@@ -328,7 +302,7 @@ export default function App() {
   const y3 = useTransform(scrollYProgress, [0, 1], [0, -100]);
   const springY3 = useSpring(y3, { stiffness: 100, damping: 30 });
 
-  const filteredSchools = selectedKecamatan 
+  const filteredSchools = selectedKecamatan
     ? schoolsData.filter(school => school.kecamatan === selectedKecamatan)
     : [];
 
@@ -353,33 +327,33 @@ export default function App() {
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[800px] bg-radial-pattern opacity-50"></div>
         <div className="absolute inset-0 bg-grid-pattern opacity-20"></div>
-        
+
         {/* Floating 3D Elements */}
-        <motion.div 
+        <motion.div
           style={{ y: springY2, rotate: rotate }}
           className="absolute top-1/4 left-[5%] text-primary/10 hidden sm:block"
         >
           <Globe size={120} strokeWidth={0.5} />
         </motion.div>
-        <motion.div 
+        <motion.div
           style={{ y: springY1, rotate: -rotate }}
           className="absolute top-1/3 right-[5%] text-primary/10"
         >
           <GraduationCap size={150} strokeWidth={0.5} />
         </motion.div>
-        <motion.div 
+        <motion.div
           style={{ y: springY2, x: 50 }}
           className="absolute bottom-1/4 left-[10%] text-primary/5"
         >
           <Lightbulb size={100} strokeWidth={0.5} />
         </motion.div>
-        <motion.div 
+        <motion.div
           style={{ y: springY1, rotate: rotate }}
           className="absolute top-2/3 right-[15%] text-primary/10 hidden md:block"
         >
           <AppWindow size={110} strokeWidth={0.5} />
         </motion.div>
-        <motion.div 
+        <motion.div
           style={{ y: springY2, rotate: -rotate }}
           className="absolute bottom-1/3 left-[20%] text-primary/5 hidden lg:block"
         >
@@ -392,9 +366,9 @@ export default function App() {
         <div className="container mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="h-10 lg:h-12 w-auto">
-              <img 
-                src="https://sipandusd.disdikbudtabalong.id/tabalong-smart.png" 
-                alt="Tabalong Smart Logo" 
+              <img
+                src="https://sipandusd.disdikbudtabalong.id/tabalong-smart.png"
+                alt="Tabalong Smart Logo"
                 className="h-full w-auto object-contain"
                 referrerPolicy="no-referrer"
               />
@@ -405,32 +379,49 @@ export default function App() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-10">
-            {navLinks.map((link) => (
-              <a 
-                key={link.name} 
-                href={link.href} 
-                className="relative text-sm font-medium text-white/60 hover:text-emerald-400 transition-colors group"
-              >
-                {link.name}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-400 transition-all duration-300 group-hover:w-full" />
-              </a>
-            ))}
+          <div className="hidden md:flex items-center gap-6">
+            <div className="flex items-center gap-8 mr-4">
+              {navLinks.map((link) => (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  className="relative text-sm font-medium text-white/60 hover:text-emerald-400 transition-colors group"
+                >
+                  {link.name}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-400 transition-all duration-300 group-hover:w-full" />
+                </a>
+              ))}
+            </div>
+            <a
+              href="#admin"
+              className="hidden md:flex items-center gap-2 bg-primary/10 hover:bg-primary text-primary hover:text-black border border-primary/20 hover:border-primary px-5 py-2 rounded-xl text-sm font-bold transition-all duration-300"
+            >
+              <UserCheck size={16} />
+              Login
+            </a>
           </div>
 
-          <button 
-            onClick={toggleMobileMenu}
-            className="md:hidden p-2 text-white/60 hover:text-white transition-colors"
-          >
-            <LayoutGrid className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-3 md:hidden">
+            <a
+              href="#admin"
+              className="p-2 text-primary bg-primary/10 rounded-lg transition-colors hover:bg-primary hover:text-black"
+            >
+              <UserCheck size={20} />
+            </a>
+            <button
+              onClick={toggleMobileMenu}
+              className="p-2 text-white/60 hover:text-white transition-colors"
+            >
+              <LayoutGrid className="w-6 h-6" />
+            </button>
+          </div>
         </div>
       </nav>
 
       {/* Mobile Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -450,6 +441,11 @@ export default function App() {
                   </a>
                 );
               })}
+              <div className="h-px bg-white/10 my-2"></div>
+              <a href="#admin" onClick={toggleMobileMenu} className="text-base font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-3 bg-primary/10 p-4 rounded-xl border border-primary/20">
+                <UserCheck className="w-5 h-5" />
+                Login Admin
+              </a>
             </div>
           </motion.div>
         )}
@@ -457,7 +453,7 @@ export default function App() {
 
       {/* Hero Section */}
       <section id="home" className="relative min-h-screen flex items-center pt-32 pb-20 lg:pt-40 lg:pb-24 perspective-1000">
-        <motion.div 
+        <motion.div
           style={{ y: springY1 }}
           className="container mx-auto px-6 relative z-10 w-full"
         >
@@ -476,7 +472,7 @@ export default function App() {
                 Akses mudah dan cepat ke seluruh aplikasi layanan pendidikan dasar di lingkungan Dinas Pendidikan dan Kebudayaan Kabupaten Tabalong.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                <motion.a 
+                <motion.a
                   href="#layanan"
                   whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(0, 255, 133, 0.6)" }}
                   whileTap={{ scale: 0.95 }}
@@ -508,7 +504,7 @@ export default function App() {
 
           {/* Bento Grid Features - Inspired by Video */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               whileHover={{ rotateY: 10, rotateX: -5, translateZ: 20 }}
@@ -528,7 +524,7 @@ export default function App() {
               </div>
             </motion.div>
 
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               whileHover={{ rotateY: -5, rotateX: 5, translateZ: 20 }}
@@ -541,7 +537,7 @@ export default function App() {
                 <p className="text-white/40 text-lg max-w-sm mb-8">Kurangi beban administrasi manual hingga 90% dengan sistem otomatisasi kami.</p>
                 <div className="flex items-center gap-4">
                   <div className="flex -space-x-3">
-                    {[1,2,3,4].map(i => (
+                    {[1, 2, 3, 4].map(i => (
                       <div key={i} className="w-10 h-10 rounded-full border-2 border-bg-dark bg-slate-800 overflow-hidden">
                         <img src={`https://picsum.photos/seed/user${i}/100/100`} alt="User" referrerPolicy="no-referrer" />
                       </div>
@@ -553,7 +549,7 @@ export default function App() {
               <div className="absolute bottom-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -mr-32 -mb-32 group-hover:bg-primary/20 transition-all duration-700"></div>
             </motion.div>
 
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               whileHover={{ rotateY: -10, rotateX: -5, translateZ: 20 }}
@@ -569,7 +565,7 @@ export default function App() {
                 <p className="text-white/40 text-sm leading-relaxed">Dapat diakses kapan saja dan di mana saja melalui perangkat apa pun.</p>
               </div>
               <div className="mt-8 flex items-center gap-1">
-                {[1,2,3,4,5].map(i => <div key={i} className="h-1 w-full bg-primary/20 rounded-full overflow-hidden"><div className="h-full bg-primary w-2/3"></div></div>)}
+                {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-1 w-full bg-primary/20 rounded-full overflow-hidden"><div className="h-full bg-primary w-2/3"></div></div>)}
               </div>
             </motion.div>
           </div>
@@ -579,7 +575,7 @@ export default function App() {
 
       {/* Website SD Section */}
       <section id="website-sd" className="py-12 md:py-16 relative perspective-1000">
-        <motion.div 
+        <motion.div
           className="container mx-auto px-6 relative z-10"
         >
           <div className="text-center mb-20">
@@ -607,7 +603,7 @@ export default function App() {
 
 
         </motion.div>
-        
+
       </section>
 
       {/* Layanan Section */}
@@ -621,54 +617,62 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {applications.map((app, idx) => (
-              <motion.a
-                key={app.title}
-                href={app.link}
-                initial={{ opacity: 0, y: 20, rotateX: 10 }}
-                whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
-                whileHover={{ 
-                  y: -12,
-                  rotateY: 10,
-                  rotateX: -5,
-                  translateZ: 30,
-                  boxShadow: "0 25px 50px -12px rgba(0, 255, 133, 0.15)",
-                }}
-                viewport={{ once: true }}
-                transition={{ 
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 20,
-                  delay: idx * 0.1 
-                }}
-                className={`glass p-6 rounded-[24px] hover:bg-white/[0.05] hover:border-white/20 transition-all group relative preserve-3d ${
-                  app.status === "Coming Soon" ? "pointer-events-none opacity-80" : ""
-                }`}
-              >
-                {app.status === "Coming Soon" && (
-                  <div className="absolute top-6 right-6 translate-z-20">
-                    <span className="px-3 py-1 rounded-full bg-white/10 border border-white/10 text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                      Soon
-                    </span>
-                  </div>
-                )}
-                <motion.div 
-                  whileHover={{ scale: 1.15, rotateZ: 5 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                  className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center mb-6 group-hover:bg-primary/10 transition-colors translate-z-10"
+            {applicationsData.map((app, idx) => {
+              const IconComponent = typeof app.icon === 'string' && iconMap[app.icon] ? iconMap[app.icon] : LayoutGrid;
+              return (
+                <motion.a
+                  key={app.title}
+                  href={app.link}
+                  initial={{ opacity: 0, y: 20, rotateX: 10 }}
+                  whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+                  whileHover={{
+                    y: -12,
+                    rotateY: 10,
+                    rotateX: -5,
+                    translateZ: 30,
+                    boxShadow: "0 25px 50px -12px rgba(0, 255, 133, 0.15)",
+                  }}
+                  viewport={{ once: true }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 20,
+                    delay: idx * 0.1
+                  }}
+                  className={`glass p-6 rounded-[24px] hover:bg-white/[0.05] hover:border-white/20 transition-all group relative preserve-3d ${app.status === "Coming Soon" ? "pointer-events-none opacity-80" : ""
+                    }`}
                 >
-                  {app.icon}
-                </motion.div>
-                <h3 className="text-lg font-bold mb-2 group-hover:text-primary transition-colors translate-z-10">{app.title}</h3>
-                <p className="text-white/40 text-xs mb-6 leading-relaxed translate-z-10">{app.description}</p>
-                <div className="pt-4 border-t border-white/5 flex items-center justify-between translate-z-10">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white/20 group-hover:text-white/40 transition-colors">{app.stats}</span>
-                  {app.status !== "Coming Soon" && (
-                    <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                  {app.status === "Coming Soon" && (
+                    <div className="absolute top-6 right-6 translate-z-20">
+                      <span className="px-3 py-1 rounded-full bg-white/10 border border-white/10 text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                        Soon
+                      </span>
+                    </div>
                   )}
-                </div>
-              </motion.a>
-            ))}
+                  <motion.div
+                    whileHover={{ scale: 1.15, rotateZ: 5 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                    className={`w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center mb-6 group-hover:bg-primary/10 transition-colors translate-z-10 ${app.logoUrl ? 'overflow-hidden' : ''}`}
+                  >
+                    {app.logoUrl ? (
+                      <img src={app.logoUrl} alt={app.title} className="w-full h-full object-contain p-1" referrerPolicy="no-referrer" />
+                    ) : typeof app.icon === 'string' ? (
+                      <IconComponent className="w-5 h-5 text-primary" />
+                    ) : (
+                      app.icon
+                    )}
+                  </motion.div>
+                  <h3 className="text-lg font-bold mb-2 group-hover:text-primary transition-colors translate-z-10">{app.title}</h3>
+                  <p className="text-white/40 text-xs mb-6 leading-relaxed translate-z-10">{app.description}</p>
+                  <div className="pt-4 border-t border-white/5 flex items-center justify-between translate-z-10">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/20 group-hover:text-white/40 transition-colors">{app.stats}</span>
+                    {app.status !== "Coming Soon" && (
+                      <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                    )}
+                  </div>
+                </motion.a>
+              )
+            })}
           </div>
         </div>
 
@@ -690,22 +694,22 @@ export default function App() {
               { label: "Tahun Ini", value: stats.year, icon: CalendarRange },
               { label: "Total", value: stats.total, icon: BarChart3 }
             ].map((stat, idx) => (
-              <motion.div 
+              <motion.div
                 key={stat.label}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.1 }}
-                whileHover={{ 
-                  scale: 1.05, 
-                  rotateX: 10, 
+                whileHover={{
+                  scale: 1.05,
+                  rotateX: 10,
                   rotateY: 10,
                   z: 50,
                   boxShadow: "0 0 30px rgba(34, 197, 94, 0.5)"
                 }}
                 className="glass p-6 rounded-3xl text-center cursor-pointer border border-white/10 shadow-xl transition-all duration-300"
               >
-                <motion.div 
+                <motion.div
                   whileHover={{ rotate: 360 }}
                   transition={{ duration: 0.5 }}
                   className="inline-flex p-3 rounded-full bg-primary/10 mb-4"
@@ -731,44 +735,44 @@ export default function App() {
             <h2 className="text-3xl lg:text-5xl font-bold tracking-tight mb-4">Profil Tim</h2>
             <p className="text-white/40 text-lg">Bidang Pembinaan SD Dinas Pendidikan Tabalong</p>
           </div>
-          
+
           {profiles.length > 5 ? (
             <div className="relative w-[100vw] left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden py-10">
               <div className="animate-marquee flex w-max items-center gap-12 md:gap-16 px-6 hover:[animation-play-state:paused]">
                 {[...profiles, ...profiles].map((profile, idx) => (
-                  <div 
+                  <div
                     key={idx}
                     className="flex flex-col items-center text-center group shrink-0 w-56 md:w-64"
                   >
                     {/* Unique Animated Frame */}
                     <div className="relative w-48 h-48 md:w-56 md:h-56 mb-6 mx-auto">
                       {/* Animated glowing background blob */}
-                      <motion.div 
-                        animate={{ 
+                      <motion.div
+                        animate={{
                           rotate: [0, 90, 180, 270, 360],
                           borderRadius: ["40% 60% 70% 30% / 40% 50% 60% 50%", "60% 40% 30% 70% / 60% 30% 70% 40%", "40% 60% 70% 30% / 40% 50% 60% 50%"]
                         }}
                         transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
                         className="absolute inset-0 bg-gradient-to-tr from-primary via-accent to-purple-500 opacity-70 blur-md group-hover:opacity-100 transition-opacity"
                       />
-                      
+
                       {/* The actual image container with morphing border radius */}
-                      <motion.div 
-                        animate={{ 
+                      <motion.div
+                        animate={{
                           borderRadius: ["40% 60% 70% 30% / 40% 50% 60% 50%", "60% 40% 30% 70% / 60% 30% 70% 40%", "40% 60% 70% 30% / 40% 50% 60% 50%"]
                         }}
                         transition={{ duration: 8, repeat: Infinity, ease: "linear", delay: 0.5 }}
                         className="absolute inset-1 bg-black overflow-hidden border-2 border-white/10 z-10"
                       >
-                        <img 
-                          src={profile.FotoURL} 
+                        <img
+                          src={profile.FotoURL}
                           alt={profile.Nama}
                           className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                           referrerPolicy="no-referrer"
                         />
                       </motion.div>
                     </div>
-                    
+
                     <h3 className="text-xl font-bold text-white mb-2">{profile.Nama}</h3>
                     <p className="text-primary text-sm font-semibold tracking-wider uppercase">{profile.Jabatan}</p>
                   </div>
@@ -778,7 +782,7 @@ export default function App() {
           ) : (
             <div className="flex flex-col md:flex-row justify-center items-center gap-12 md:gap-8 lg:gap-16 flex-wrap">
               {profiles.map((profile, idx) => (
-                <motion.div 
+                <motion.div
                   key={idx}
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -789,32 +793,32 @@ export default function App() {
                   {/* Unique Animated Frame */}
                   <div className="relative w-48 h-48 md:w-56 md:h-56 mb-6 mx-auto">
                     {/* Animated glowing background blob */}
-                    <motion.div 
-                      animate={{ 
+                    <motion.div
+                      animate={{
                         rotate: [0, 90, 180, 270, 360],
                         borderRadius: ["40% 60% 70% 30% / 40% 50% 60% 50%", "60% 40% 30% 70% / 60% 30% 70% 40%", "40% 60% 70% 30% / 40% 50% 60% 50%"]
                       }}
                       transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
                       className="absolute inset-0 bg-gradient-to-tr from-primary via-accent to-purple-500 opacity-70 blur-md group-hover:opacity-100 transition-opacity"
                     />
-                    
+
                     {/* The actual image container with morphing border radius */}
-                    <motion.div 
-                      animate={{ 
+                    <motion.div
+                      animate={{
                         borderRadius: ["40% 60% 70% 30% / 40% 50% 60% 50%", "60% 40% 30% 70% / 60% 30% 70% 40%", "40% 60% 70% 30% / 40% 50% 60% 50%"]
                       }}
                       transition={{ duration: 8, repeat: Infinity, ease: "linear", delay: 0.5 }}
                       className="absolute inset-1 bg-black overflow-hidden border-2 border-white/10 z-10"
                     >
-                      <img 
-                        src={profile.FotoURL} 
+                      <img
+                        src={profile.FotoURL}
                         alt={profile.Nama}
                         className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                         referrerPolicy="no-referrer"
                       />
                     </motion.div>
                   </div>
-                  
+
                   <h3 className="text-xl font-bold text-white mb-2">{profile.Nama}</h3>
                   <p className="text-primary text-sm font-semibold tracking-wider uppercase">{profile.Jabatan}</p>
                 </motion.div>
@@ -829,7 +833,7 @@ export default function App() {
         <div className="container mx-auto px-6 max-w-5xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Card Kritik & Saran */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -840,7 +844,7 @@ export default function App() {
               </div>
               <h3 className="text-2xl font-bold mb-3">Kritik & Saran</h3>
               <p className="text-white/40 text-sm mb-8 leading-relaxed">Punya masukan untuk kami? Sampaikan kritik dan saran Anda untuk pengembangan portal layanan ini.</p>
-              <motion.button 
+              <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveFormModal('kritik')}
@@ -851,7 +855,7 @@ export default function App() {
             </motion.div>
 
             {/* Card Usul Website */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -863,7 +867,7 @@ export default function App() {
               </div>
               <h3 className="text-2xl font-bold mb-3">Usulkan Website</h3>
               <p className="text-white/40 text-sm mb-8 leading-relaxed">Sekolah Anda belum terdaftar? Daftarkan website sekolah Anda sekarang agar terintegrasi di portal ini.</p>
-              <motion.button 
+              <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveFormModal('usul')}
@@ -878,7 +882,7 @@ export default function App() {
 
       {/* FAQ Section - Inspired by Video */}
       <section id="faq" className="py-12 md:py-16 bg-white/[0.02] relative perspective-1000 overflow-hidden">
-        <motion.div 
+        <motion.div
           className="container mx-auto px-6 max-w-4xl relative z-10"
         >
           <div className="text-center mb-20">
@@ -888,23 +892,23 @@ export default function App() {
 
           <div className="space-y-4">
             {faqs.map((faq, idx) => (
-              <motion.div 
-                key={idx} 
-                animate={{ 
+              <motion.div
+                key={idx}
+                animate={{
                   backgroundColor: activeFaq === idx ? "rgba(255, 255, 255, 0.05)" : "rgba(255, 255, 255, 0.02)",
                   borderColor: activeFaq === idx ? "rgba(0, 255, 133, 0.3)" : "rgba(255, 255, 255, 0.08)"
                 }}
                 className="glass rounded-3xl overflow-hidden transition-colors duration-300"
               >
-                <button 
+                <button
                   onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
                   className="w-full p-8 flex items-center justify-between text-left transition-colors"
                 >
                   <span className={`text-lg font-bold transition-colors duration-300 ${activeFaq === idx ? 'text-primary' : 'text-white'}`}>{faq.question}</span>
-                  <motion.div 
-                    animate={{ 
-                      rotate: activeFaq === idx ? 180 : 0, 
-                      backgroundColor: activeFaq === idx ? "rgba(0, 255, 133, 0.2)" : "rgba(255, 255, 255, 0.05)" 
+                  <motion.div
+                    animate={{
+                      rotate: activeFaq === idx ? 180 : 0,
+                      backgroundColor: activeFaq === idx ? "rgba(0, 255, 133, 0.2)" : "rgba(255, 255, 255, 0.05)"
                     }}
                     transition={{ duration: 0.3 }}
                     className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 ml-4"
@@ -920,7 +924,7 @@ export default function App() {
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.3, ease: "easeInOut" }}
                     >
-                      <motion.div 
+                      <motion.div
                         initial={{ y: -10, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: -10, opacity: 0 }}
@@ -941,7 +945,7 @@ export default function App() {
       {/* Footer */}
       <footer id="kontak" className="pt-16 pb-8 md:pt-20 md:pb-8 relative perspective-1000">
         <div className="container mx-auto px-6 relative z-10">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -961,9 +965,9 @@ export default function App() {
                   </h4>
                   <div className="flex items-center gap-4 mb-6">
                     <div className="h-12 w-auto">
-                      <img 
-                        src="https://sipandusd.disdikbudtabalong.id/tabalong-smart.png" 
-                        alt="Tabalong Smart Logo" 
+                      <img
+                        src="https://sipandusd.disdikbudtabalong.id/tabalong-smart.png"
+                        alt="Tabalong Smart Logo"
                         className="h-full w-auto object-contain"
                         referrerPolicy="no-referrer"
                       />
@@ -981,8 +985,8 @@ export default function App() {
                       { Icon: Instagram, href: "https://www.instagram.com/disdikbud_tabalong/" },
                       { Icon: Youtube, href: "https://www.youtube.com/@dinaspendidikandankebudaya1488" }
                     ].map(({ Icon, href }, i) => (
-                      <a 
-                        key={i} 
+                      <a
+                        key={i}
                         href={href}
                         className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:bg-primary hover:text-black hover:scale-110 transition-all duration-300"
                       >
@@ -1001,8 +1005,8 @@ export default function App() {
                   <ul className="space-y-3">
                     {navLinks.map(link => (
                       <li key={link.name}>
-                        <a 
-                          href={link.href} 
+                        <a
+                          href={link.href}
                           className="text-white/40 hover:text-white hover:translate-x-2 transition-all flex items-center gap-2 group text-sm"
                         >
                           <ChevronRight className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
@@ -1055,7 +1059,7 @@ export default function App() {
                     <button onClick={() => setPolicyModal('terms')} className="text-white/20 hover:text-white text-xs transition-colors">Syarat Layanan</button>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-col items-center lg:items-end gap-3 text-center lg:text-right">
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 cursor-default">
                     <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></span>
@@ -1099,10 +1103,10 @@ export default function App() {
                   <>
                     <h4 className="text-xl font-bold text-white">1. Pengumpulan Informasi</h4>
                     <p>Kami mengumpulkan informasi yang Anda berikan secara langsung kepada kami, seperti saat Anda membuat akun, memperbarui profil, menggunakan fitur interaktif layanan kami, atau berkomunikasi dengan kami. Jenis informasi yang mungkin kami kumpulkan termasuk nama, alamat email, nomor telepon, dan informasi kontak atau identifikasi lainnya yang Anda pilih untuk diberikan.</p>
-                    
+
                     <h4 className="text-xl font-bold text-white mt-8">2. Penggunaan Informasi</h4>
                     <p>Kami menggunakan informasi yang kami kumpulkan untuk menyediakan, memelihara, dan meningkatkan layanan kami. Kami juga dapat menggunakan informasi tersebut untuk mengirimkan pemberitahuan teknis, pembaruan, peringatan keamanan, dan pesan dukungan serta administratif.</p>
-                    
+
                     <h4 className="text-xl font-bold text-white mt-8">3. Keamanan Data</h4>
                     <p>Kami mengambil langkah-langkah yang wajar untuk membantu melindungi informasi tentang Anda dari kehilangan, pencurian, penyalahgunaan, dan akses, pengungkapan, perubahan, dan penghancuran yang tidak sah. Namun, tidak ada sistem keamanan yang tidak dapat ditembus, dan kami tidak dapat menjamin keamanan database kami.</p>
                   </>
@@ -1110,10 +1114,10 @@ export default function App() {
                   <>
                     <h4 className="text-xl font-bold text-white">1. Ketentuan Penggunaan</h4>
                     <p>Dengan mengakses dan menggunakan portal layanan ini, Anda menyetujui untuk terikat oleh Syarat Layanan ini dan semua hukum dan peraturan yang berlaku. Jika Anda tidak setuju dengan bagian mana pun dari syarat ini, Anda dilarang menggunakan atau mengakses situs ini.</p>
-                    
+
                     <h4 className="text-xl font-bold text-white mt-8">2. Lisensi Penggunaan</h4>
                     <p>Izin diberikan untuk mengunduh sementara satu salinan materi (informasi atau perangkat lunak) di portal layanan Bidang Pembinaan SD hanya untuk tampilan transitori pribadi dan non-komersial. Ini adalah pemberian lisensi, bukan transfer hak milik.</p>
-                    
+
                     <h4 className="text-xl font-bold text-white mt-8">3. Batasan Tanggung Jawab</h4>
                     <p>Dalam keadaan apa pun, Bidang Pembinaan SD atau pemasoknya tidak bertanggung jawab atas kerugian (termasuk, tanpa batasan, ganti rugi atas hilangnya data atau keuntungan, atau karena gangguan bisnis) yang timbul dari penggunaan atau ketidakmampuan untuk menggunakan materi di portal layanan ini.</p>
                   </>
@@ -1157,7 +1161,7 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="flex flex-col items-center justify-center py-8 text-center"
                     >
-                      <motion.div 
+                      <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
@@ -1167,10 +1171,10 @@ export default function App() {
                       </motion.div>
                       <h4 className="text-2xl font-bold mb-3">Pesan Terkirim!</h4>
                       <p className="text-white/60 text-sm leading-relaxed max-w-xs mx-auto">Terima kasih atas kritik dan saran Anda. Masukan Anda sangat berarti bagi kami.</p>
-                      <motion.button 
+                      <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => { setActiveFormModal(null); setIsKritikSubmitted(false); }} 
+                        onClick={() => { setActiveFormModal(null); setIsKritikSubmitted(false); }}
                         className="mt-8 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white text-sm font-bold transition-colors"
                       >
                         Tutup
@@ -1190,10 +1194,10 @@ export default function App() {
                         <label className="block text-xs font-bold text-white/60 uppercase tracking-wider mb-2">Pesan</label>
                         <textarea required name="pesan" rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors resize-none" placeholder="Tuliskan kritik dan saran Anda"></textarea>
                       </div>
-                      <motion.button 
+                      <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        type="submit" 
+                        type="submit"
                         disabled={isSubmitting}
                         className="w-full bg-primary text-black font-bold py-4 rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -1208,7 +1212,7 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="flex flex-col items-center justify-center py-8 text-center"
                     >
-                      <motion.div 
+                      <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
@@ -1218,10 +1222,10 @@ export default function App() {
                       </motion.div>
                       <h4 className="text-2xl font-bold mb-3">Usulan Berhasil Dikirim!</h4>
                       <p className="text-white/60 text-sm leading-relaxed max-w-xs mx-auto">Terima kasih, usulan website sekolah Anda telah kami terima dan akan segera ditinjau oleh tim kami.</p>
-                      <motion.button 
+                      <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => setIsUsulSubmitted(false)} 
+                        onClick={() => setIsUsulSubmitted(false)}
                         className="mt-8 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white text-sm font-bold transition-colors"
                       >
                         Kirim Usulan Lain
@@ -1246,10 +1250,10 @@ export default function App() {
                         <label className="block text-xs font-bold text-white/60 uppercase tracking-wider mb-2">URL Website</label>
                         <input required name="url" type="url" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors" placeholder="https://www.namasekolah.sch.id" />
                       </div>
-                      <motion.button 
+                      <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        type="submit" 
+                        type="submit"
                         disabled={isSubmitting}
                         className="w-full bg-primary text-black font-bold py-4 rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -1287,7 +1291,7 @@ export default function App() {
                   <h3 className="text-2xl font-bold">Website Sekolah</h3>
                   <p className="text-primary text-xs font-bold uppercase tracking-widest mt-1">Kecamatan {selectedKecamatan}</p>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsModalOpen(false)}
                   className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
                 >
@@ -1324,6 +1328,49 @@ export default function App() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Back to Top Button */}
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 20 }}
+            className="fixed bottom-8 right-8 z-50 group flex items-center justify-center"
+          >
+            {/* Rotating Circular Text */}
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 12, ease: "linear", repeat: Infinity }}
+              className="absolute w-[120px] h-[120px] pointer-events-none opacity-40 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+            >
+              <svg viewBox="0 0 100 100" className="w-full h-full origin-center">
+                <path
+                  id="textCircle"
+                  d="M 50, 50 m -40, 0 a 40,40 0 1,1 80,0 a 40,40 0 1,1 -80,0"
+                  fill="none"
+                  stroke="none"
+                />
+                <text className="text-[10.5px] font-normal uppercase fill-current tracking-widest text-primary drop-shadow-[0_0_8px_rgba(0,255,133,0.8)]">
+                  <textPath href="#textCircle" startOffset="0%">
+                    BIDANG PSD DISDIKBUD KAB. TABALONG *
+                  </textPath>
+                </text>
+              </svg>
+            </motion.div>
+
+            <motion.button
+              whileHover={{ scale: 1.1, boxShadow: "0 0 20px rgba(0, 255, 133, 0.4)" }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="p-4 rounded-full bg-primary text-black font-bold shadow-xl border border-primary/20 backdrop-blur-md relative z-10"
+              aria-label="Kembali ke atas"
+            >
+              <ArrowUp size={24} />
+            </motion.button>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
